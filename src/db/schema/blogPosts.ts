@@ -22,6 +22,7 @@ export const blogPosts = sqliteTable('blog_posts', {
 	updatedAt: integer('updated_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`)
+		.$onUpdate(() => new Date())
 });
 
 export type BlogPost = typeof blogPosts.$inferSelect;

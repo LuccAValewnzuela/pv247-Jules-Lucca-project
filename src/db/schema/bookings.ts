@@ -45,6 +45,7 @@ export const bookings = sqliteTable('bookings', {
 	updatedAt: integer('updated_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`)
+		.$onUpdate(() => new Date())
 });
 
 export type Booking = typeof bookings.$inferSelect;

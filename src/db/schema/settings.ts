@@ -10,6 +10,7 @@ export const settings = sqliteTable('settings', {
 	updatedAt: integer('updated_at', { mode: 'timestamp' })
 		.notNull()
 		.default(sql`(unixepoch())`)
+		.$onUpdate(() => new Date())
 });
 
 export type Settings = typeof settings.$inferSelect;
