@@ -4,9 +4,9 @@ dotenv.config({ path: ".env.local" });
 import { defineConfig } from "drizzle-kit";
 
 export default defineConfig({
-  schema: "./src/db/schema.ts",
+  schema: "./src/db/schema/index.ts",
   out: "./drizzle",
-  dialect: "sqlite",
+  dialect: "turso",
   dbCredentials: {
     url: process.env.DATABASE_URL!,
     ...(process.env.DATABASE_AUTH_TOKEN && {
