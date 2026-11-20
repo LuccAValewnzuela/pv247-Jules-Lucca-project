@@ -1,14 +1,14 @@
 import { sql } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-import { users } from './users';
+import { user } from './users';
 
 export const clients = sqliteTable('clients', {
 	id: text('id')
 		.primaryKey()
 		.default(sql`(lower(hex(randomblob(16))))`),
 	userId: text('user_id')
-		.references(() => users.id)
+		.references(() => user.id)
 		.unique(),
 	name: text('name').notNull(),
 	email: text('email').notNull(),
