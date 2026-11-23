@@ -7,9 +7,12 @@ import {
 	clientNotes,
 	clients,
 	contactMessages,
+	account,
+	session,
 	sessionTypes,
 	settings,
-	users
+	user,
+	verification
 } from './schema';
 
 // Usage:
@@ -19,8 +22,9 @@ import {
 const RESET = process.argv.includes('--reset');
 
 // Use your own Google email (via env) so you get the therapist role when signing in.
-const THERAPIST_EMAIL =
-	process.env.SEED_THERAPIST_EMAIL ?? 'therapist@example.com';
+const THERAPIST_EMAIL = (
+	process.env.SEED_THERAPIST_EMAIL ?? 'therapist@example.com'
+).toLowerCase();
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -53,11 +57,11 @@ const blockDays = () =>
 			const hours = WORKING_HOURS[atDay(offset, 0).getDay()];
 			return hours
 				? [
-						{
-							startsAt: atDay(offset, hours[0]),
-							endsAt: atDay(offset, hours[1])
-						}
-					]
+					{
+						startsAt: atDay(offset, hours[0]),
+						endsAt: atDay(offset, hours[1])
+					}
+				]
 				: [];
 		});
 
@@ -77,7 +81,10 @@ const resetAll = async (tx: Tx) => {
 	await tx.delete(bookings);
 	await tx.delete(clientNotes);
 	await tx.delete(clients);
-	await tx.delete(users);
+	await tx.delete(session);
+	await tx.delete(account);
+	await tx.delete(verification);
+	await tx.delete(user);
 	await tx.delete(availabilityBlocks);
 	await tx.delete(sessionTypes);
 	await tx.delete(blogPosts);
@@ -96,13 +103,23 @@ const seedAll = async (tx: Tx) => {
 
 	// Users: the therapist and three clients with an account
 	const [, annaUser, tomasUser, martinUser] = await tx
-		.insert(users)
-		.values([
-			{ email: THERAPIST_EMAIL, name: 'Therapist', role: 'therapist' },
-			{ email: 'anna.novakova@example.com', name: 'Anna Nováková' },
-			{ email: 'tomas.dvorak@example.com', name: 'Tomáš Dvořák' },
-			{ email: 'martin.svoboda@example.com', name: 'Martin Svoboda' }
-		])
+		.insert(user)
+		.values(
+			[
+				{
+					email: THERAPIST_EMAIL,
+					name: 'Therapist',
+					role: 'therapist' as const
+				},
+				{ email: 'anna.novakova@example.com', name: 'Anna Nováková' },
+				{ email: 'tomas.dvorak@example.com', name: 'Tomáš Dvořák' },
+				{ email: 'martin.svoboda@example.com', name: 'Martin Svoboda' }
+			].map(row => ({
+				...row,
+				id: crypto.randomUUID(),
+				emailVerified: true
+			}))
+		)
 		.returning();
 
 	// Clients: three linked to an account, two created by the therapist
@@ -386,7 +403,7 @@ const main = async () => {
 	const summary = await db.transaction(async tx => {
 		if (RESET) {
 			await resetAll(tx);
-		} else if (await tx.query.users.findFirst()) {
+		} else if (await tx.query.user.findFirst()) {
 			return null;
 		}
 		return seedAll(tx);

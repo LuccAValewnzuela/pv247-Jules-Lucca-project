@@ -7,14 +7,24 @@ import { bookings } from './bookings';
 import { clientNotes } from './clientNotes';
 import { clients } from './clients';
 import { sessionTypes } from './sessionTypes';
-import { users } from './users';
+import { account, session, user } from './users';
 
-export const usersRelations = relations(users, ({ one }) => ({
-	client: one(clients)
+export const userRelations = relations(user, ({ one, many }) => ({
+	client: one(clients),
+	sessions: many(session),
+	accounts: many(account)
+}));
+
+export const sessionRelations = relations(session, ({ one }) => ({
+	user: one(user, { fields: [session.userId], references: [user.id] })
+}));
+
+export const accountRelations = relations(account, ({ one }) => ({
+	user: one(user, { fields: [account.userId], references: [user.id] })
 }));
 
 export const clientsRelations = relations(clients, ({ one, many }) => ({
-	user: one(users, { fields: [clients.userId], references: [users.id] }),
+	user: one(user, { fields: [clients.userId], references: [user.id] }),
 	bookings: many(bookings),
 	notes: many(clientNotes)
 }));
