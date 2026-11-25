@@ -3,7 +3,9 @@ import { Suspense } from 'react';
 
 import { getSession, safeCallbackUrl } from '@/auth/session';
 import { GoogleLoginButton } from '@/components/auth/google-login-button';
+import { LoginToast } from '@/components/auth/login-toast';
 import { LogoutButton } from '@/components/auth/logout-button';
+import { Loader } from '@/components/loader';
 
 export const metadata: Metadata = { title: 'Log in' };
 
@@ -16,17 +18,16 @@ const Login = async ({ searchParams }: LoginContentProps) => {
 	return (
 		<>
 			{error && (
-				<p className="rounded-md bg-red-50 p-3 text-sm text-red-700">
-					Login failed. Please try again.
-				</p>
+				<LoginToast type="error" message="Login failed. Please try again." />
 			)}
 
 			{session ? (
 				<>
 					{callbackUrl && (
-						<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
-							Your account doesn&apos;t have access to this page.
-						</p>
+						<LoginToast
+							type="warning"
+							message="Your account doesn't have access to this page."
+						/>
 					)}
 					<p>
 						Logged in as <strong>{session.user.email}</strong> (
@@ -44,7 +45,7 @@ const Login = async ({ searchParams }: LoginContentProps) => {
 const LoginPage = ({ searchParams }: PageProps<'/login'>) => (
 	<main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 p-6">
 		<h1 className="text-2xl font-semibold">Log in</h1>
-		<Suspense fallback={<p className="text-sm opacity-60">Loading...</p>}>
+		<Suspense fallback={<Loader />}>
 			<Login searchParams={searchParams} />
 		</Suspense>
 	</main>

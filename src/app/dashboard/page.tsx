@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requireTherapist } from '@/auth/session';
+import { Loader } from '@/components/loader';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -15,7 +16,7 @@ const Dashboard = async () => {
 const DashboardPage = () => (
 	<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">
 		<h1 className="text-2xl font-semibold">Dashboard</h1>
-		<Suspense fallback={<p className="text-sm opacity-60">Loading...</p>}>
+		<Suspense fallback={<Loader />}>
 			<Dashboard />
 		</Suspense>
 	</main>

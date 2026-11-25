@@ -8,7 +8,6 @@ const isProtected = (pathname: string) =>
 		route => pathname === route || pathname.startsWith(`${route}/`)
 	);
 
-
 export default function proxy(request: NextRequest) {
 	const { pathname, search } = request.nextUrl;
 
