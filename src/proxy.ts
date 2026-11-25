@@ -1,9 +1,26 @@
-import { NextResponse } from 'next/server';
+import { getSessionCookie } from 'better-auth/cookies';
+import { type NextRequest, NextResponse } from 'next/server';
 
-// TODO: route protection — keep unauthenticated visitors out of /my-bookings
-// (client area) and /dashboard (therapist area), e.g. by checking the auth
-// session here and redirecting to the sign-in page.
-// See the Next.js 16 "Proxy" guide (formerly Middleware).
-export default function proxy() {
+const protectedRoutes = ['/my-bookings', '/dashboard'];
+
+const isProtected = (pathname: string) =>
+	protectedRoutes.some(
+		route => pathname === route || pathname.startsWith(`${route}/`)
+	);
+
+
+export default function proxy(request: NextRequest) {
+	const { pathname, search } = request.nextUrl;
+
+	if (isProtected(pathname) && !getSessionCookie(request)) {
+		const loginUrl = new URL('/login', request.url);
+		loginUrl.searchParams.set('callbackUrl', `${pathname}${search}`);
+		return NextResponse.redirect(loginUrl);
+	}
+
 	return NextResponse.next();
 }
+
+export const config = {
+	matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)']
+};

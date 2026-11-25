@@ -23,6 +23,11 @@ const Login = async ({ searchParams }: LoginContentProps) => {
 
 			{session ? (
 				<>
+					{callbackUrl && (
+						<p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+							Your account doesn&apos;t have access to this page.
+						</p>
+					)}
 					<p>
 						Logged in as <strong>{session.user.email}</strong> (
 						{session.user.role}).
