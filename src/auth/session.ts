@@ -12,7 +12,7 @@ export const getSession = cache(async () =>
 );
 
 // Only allow same-site relative paths as post-sign-in redirect targets
-export const safeCallbackURL = (value: unknown, fallback = '/') =>
+export const safeCallbackUrl = (value: unknown, fallback = '/') =>
 	typeof value === 'string' && value.startsWith('/') && !value.startsWith('//')
 		? value
 		: fallback;
