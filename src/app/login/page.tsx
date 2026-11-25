@@ -9,9 +9,7 @@ export const metadata: Metadata = { title: 'Log in' };
 
 type LoginContentProps = Pick<PageProps<'/login'>, 'searchParams'>;
 
-// Reads the session and search params (request-time data), so with
-// Cache Components it must render behind a <Suspense> boundary.
-const LoginContent = async ({ searchParams }: LoginContentProps) => {
+const Login = async ({ searchParams }: LoginContentProps) => {
 	const { callbackUrl, error } = await searchParams;
 	const session = await getSession();
 
@@ -42,7 +40,7 @@ const LoginPage = ({ searchParams }: PageProps<'/login'>) => (
 	<main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 p-6">
 		<h1 className="text-2xl font-semibold">Log in</h1>
 		<Suspense fallback={<p className="text-sm opacity-60">Loading...</p>}>
-			<LoginContent searchParams={searchParams} />
+			<Login searchParams={searchParams} />
 		</Suspense>
 	</main>
 );
