@@ -1,16 +1,35 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { requireTherapist } from '@/auth/session';
 import { Loader } from '@/components/loader';
+import { buttonVariants } from '@/components/ui/button';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
-// placeholder until the therapist features (#10 and following)
 const Dashboard = async () => {
 	const { user } = await requireTherapist('/dashboard');
 
-	return <p>Welcome, {user.name}.</p>;
+	return (
+		<div className="flex flex-col gap-6">
+			<p>Welcome, {user.name}.</p>
+			<nav aria-label="Therapist sections" className="flex flex-wrap gap-3">
+				<Link
+					href="/dashboard/session-types"
+					className={buttonVariants({ variant: 'outline' })}
+				>
+					Session types
+				</Link>
+				<Link
+					href="/dashboard/availability"
+					className={buttonVariants({ variant: 'outline' })}
+				>
+					Availability
+				</Link>
+			</nav>
+		</div>
+	);
 };
 
 const DashboardPage = () => (
