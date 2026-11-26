@@ -1,15 +1,10 @@
 import { SessionType } from "@/db/schema";
 import { ColumnDef } from "@tanstack/react-table";
+import { SessionTypeActions } from "./session-type-actions";
 
 const priceFormatter = new Intl.NumberFormat('en-GB', {
     currency: 'EUR',
     style: 'currency'
-});
-
-const dateFormatter = new Intl.DateTimeFormat('en-GB', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-    timeZone: 'Europe/Prague'
 });
 
 export const columns: ColumnDef<SessionType>[] = [
@@ -35,7 +30,7 @@ export const columns: ColumnDef<SessionType>[] = [
         accessorKey: "isActive",
         header: "ACTIVE",
         cell: ({ getValue }) => {
-            const active = getValue<Boolean>();
+            const active = getValue<boolean>();
 
             return (
                 <span className={active ? 
@@ -47,4 +42,9 @@ export const columns: ColumnDef<SessionType>[] = [
             );
         }
     },
+    {
+        id: 'actions',
+        header: 'ACTIONS',
+        cell: ({ row }) => <SessionTypeActions sessionType={row.original} />
+    }
 ];
