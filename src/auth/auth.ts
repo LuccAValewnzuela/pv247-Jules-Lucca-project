@@ -4,6 +4,7 @@ import { nextCookies } from 'better-auth/next-js';
 
 import { db } from '@/db/client';
 import { account, session, user, verification } from '@/db/schema';
+import { linkOrCreateClient } from '@/server/clients';
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
@@ -22,6 +23,16 @@ export const auth = betterAuth({
 				type: ['client', 'therapist'],
 				defaultValue: 'client',
 				input: false
+			}
+		}
+	},
+	databaseHooks: {
+		user: {
+			create: {
+				after: async newUser => {
+					if (newUser.role !== 'client') return;
+					await linkOrCreateClient(newUser);
+				}
 			}
 		}
 	},

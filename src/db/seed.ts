@@ -57,11 +57,11 @@ const blockDays = () =>
 			const hours = WORKING_HOURS[atDay(offset, 0).getDay()];
 			return hours
 				? [
-					{
-						startsAt: atDay(offset, hours[0]),
-						endsAt: atDay(offset, hours[1])
-					}
-				]
+						{
+							startsAt: atDay(offset, hours[0]),
+							endsAt: atDay(offset, hours[1])
+						}
+					]
 				: [];
 		});
 
