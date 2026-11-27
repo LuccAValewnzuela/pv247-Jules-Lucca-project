@@ -9,6 +9,7 @@ import {
 	sessionTypes
 } from '@/db/schema';
 import { generateSlots } from '@/lib/bookings';
+import { pragueMonthBounds, type Month } from '@/lib/calendar';
 
 export const getClientForUser = async (userId: string) => {
 	const rows = await db
@@ -95,6 +96,24 @@ export const getMyBookings = async (userId: string) => {
 	return { upcoming, past };
 };
 
+export const getMyBookingsForMonth = async (userId: string, month: Month) => {
+	const client = await getClientForUser(userId);
+	if (!client) return null;
+
+	const [start, end] = pragueMonthBounds(month);
+
+	return db.query.bookings.findMany({
+		where: and(
+			eq(bookings.clientId, client.id),
+			gte(bookings.startsAt, start),
+			lt(bookings.startsAt, end),
+			ne(bookings.status, 'cancelled')
+		),
+		orderBy: [asc(bookings.startsAt)],
+		with: { sessionType: true }
+	});
+};
+
 export type ActiveSessionType = Awaited<
 	ReturnType<typeof getActiveSessionTypes>
 >[number];
@@ -106,3 +125,7 @@ export type BookableSlots = NonNullable<
 export type MyBooking = NonNullable<
 	Awaited<ReturnType<typeof getMyBookings>>
 >['upcoming'][number];
+
+export type MonthBooking = NonNullable<
+	Awaited<ReturnType<typeof getMyBookingsForMonth>>
+>[number];
