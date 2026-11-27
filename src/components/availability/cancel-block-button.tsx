@@ -2,13 +2,14 @@
 
 import { useActionState, useState } from 'react';
 
+import { Button } from '@/components/ui/button';
+import { FormAlert } from '@/components/ui/field-error';
+import { Input } from '@/components/ui/input';
 import {
 	initialAvailabilityActionState,
 	type AvailabilityActionState
 } from '@/lib/availability';
 import { deleteAvailabilityBlock } from '@/server/availability-actions';
-
-import { Button } from '../ui/button';
 
 type CancelBlockButtonProps = {
 	blockId: string;
@@ -35,7 +36,7 @@ export const CancelBlockButton = ({ blockId }: CancelBlockButtonProps) => {
 
 	return (
 		<form action={formAction} className="flex flex-col items-end gap-2">
-			<input type="hidden" name="id" value={blockId} />
+			<Input type="hidden" name="id" value={blockId} />
 			<p className="max-w-48 text-right text-xs text-gray-500">
 				This removes the block and its bookings.
 			</p>
@@ -51,11 +52,7 @@ export const CancelBlockButton = ({ blockId }: CancelBlockButtonProps) => {
 			>
 				Keep block
 			</Button>
-			{state.message && (
-				<p role="alert" aria-live="polite" className="text-xs text-red-600">
-					{state.message}
-				</p>
-			)}
+			<FormAlert message={state.message} className="text-xs" />
 		</form>
 	);
 };

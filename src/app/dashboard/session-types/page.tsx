@@ -2,9 +2,9 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { requireTherapist } from '@/auth/session';
-import { Loader } from '@/components/loader';
-import { SessionTypesTable } from '@/components/session-types-table/session-types-table';
-import { buttonVariants } from '@/components/ui/button';
+import { SessionTypesTable } from '@/components/session-types';
+import { Button } from '@/components/ui/button';
+import { Loader } from '@/components/ui/loader';
 import { getSessionTypes } from '@/server/session-types';
 
 const SessionTypesList = async () => {
@@ -20,9 +20,9 @@ const SessionTypesPage = async () => (
 		<Suspense fallback={<Loader />}>
 			<SessionTypesList />
 		</Suspense>
-		<Link href="/dashboard/session-types/new" className={buttonVariants()}>
-			Create a new session type
-		</Link>
+		<Button asChild>
+			<Link href="/dashboard/session-types/new">Create a new session type</Link>
+		</Button>
 	</main>
 );
 

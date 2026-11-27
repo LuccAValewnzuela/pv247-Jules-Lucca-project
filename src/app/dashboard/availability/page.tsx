@@ -2,9 +2,8 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requireTherapist } from '@/auth/session';
-import { AvailabilityForm } from '@/components/availability-form';
-import { AvailabilityList } from '@/components/availability-list';
-import { Loader } from '@/components/loader';
+import { AvailabilityForm, AvailabilityList } from '@/components/availability';
+import { Loader } from '@/components/ui/loader';
 import { getUpcomingAvailabilityBlocks } from '@/server/availability';
 
 export const metadata: Metadata = { title: 'Availability' };

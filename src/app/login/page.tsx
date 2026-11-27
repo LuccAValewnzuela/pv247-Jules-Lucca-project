@@ -5,7 +5,7 @@ import { getSession, safeCallbackUrl } from '@/auth/session';
 import { GoogleLoginButton } from '@/components/auth/google-login-button';
 import { LoginToast } from '@/components/auth/login-toast';
 import { LogoutButton } from '@/components/auth/logout-button';
-import { Loader } from '@/components/loader';
+import { Loader } from '@/components/ui/loader';
 
 export const metadata: Metadata = { title: 'Log in' };
 

@@ -3,8 +3,8 @@ import { notFound } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { requireTherapist } from '@/auth/session';
-import { Loader } from '@/components/loader';
-import { SessionTypeForm } from '@/components/session-type-form';
+import { SessionTypeForm } from '@/components/session-types';
+import { Loader } from '@/components/ui/loader';
 import { getSessionTypeById } from '@/server/session-types';
 
 export const metadata: Metadata = { title: 'Update session type' };

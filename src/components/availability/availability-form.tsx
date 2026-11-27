@@ -2,33 +2,11 @@
 
 import { useActionState, useEffect, useRef } from 'react';
 
-import {
-	initialAvailabilityActionState,
-	type AvailabilityActionState
-} from '@/lib/availability';
+import { Button } from '@/components/ui/button';
+import { FieldError, FormAlert } from '@/components/ui/field-error';
+import { Input } from '@/components/ui/input';
+import { initialAvailabilityActionState } from '@/lib/availability';
 import { createAvailabilityBlock } from '@/server/availability-actions';
-
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-
-type FieldErrors = NonNullable<AvailabilityActionState['errors']>;
-
-const FieldError = ({
-	errors,
-	field
-}: {
-	errors?: FieldErrors;
-	field: keyof FieldErrors;
-}) => {
-	const messages = errors?.[field];
-	if (!messages?.length) return null;
-
-	return (
-		<p id={`${field}-error`} className="mt-1 text-sm text-red-600">
-			{messages[0]}
-		</p>
-	);
-};
 
 export const AvailabilityForm = () => {
 	const [state, formAction, pending] = useActionState(
@@ -67,7 +45,10 @@ export const AvailabilityForm = () => {
 					aria-invalid={startError}
 					aria-describedby={startError ? 'startsAt-error' : undefined}
 				/>
-				<FieldError errors={state.errors} field="startsAt" />
+				<FieldError
+					id={startError ? 'startsAt-error' : undefined}
+					messages={state.errors?.startsAt}
+				/>
 			</div>
 
 			<div>
@@ -83,20 +64,15 @@ export const AvailabilityForm = () => {
 					aria-invalid={endError}
 					aria-describedby={endError ? 'endsAt-error' : undefined}
 				/>
-				<FieldError errors={state.errors} field="endsAt" />
+				<FieldError
+					id={endError ? 'endsAt-error' : undefined}
+					messages={state.errors?.endsAt}
+				/>
 			</div>
 
-			{state.message && (
-				<p role="alert" aria-live="polite" className="text-sm text-red-600">
-					{state.message}
-				</p>
-			)}
+			<FormAlert message={state.message} />
 
-			<Button
-				type="submit"
-				disabled={pending}
-				className="rounded bg-gray-900 px-4 py-2 text-white disabled:opacity-50"
-			>
+			<Button type="submit" disabled={pending}>
 				{pending ? 'Adding...' : 'Add availability block'}
 			</Button>
 		</form>

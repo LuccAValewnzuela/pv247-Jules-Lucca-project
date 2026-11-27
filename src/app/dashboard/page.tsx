@@ -3,8 +3,8 @@ import Link from 'next/link';
 import { Suspense } from 'react';
 
 import { requireTherapist } from '@/auth/session';
-import { Loader } from '@/components/loader';
-import { buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { Loader } from '@/components/ui/loader';
 
 export const metadata: Metadata = { title: 'Dashboard' };
 
@@ -15,18 +15,12 @@ const Dashboard = async () => {
 		<div className="flex flex-col gap-6">
 			<p>Welcome, {user.name}.</p>
 			<nav aria-label="Therapist sections" className="flex flex-wrap gap-3">
-				<Link
-					href="/dashboard/session-types"
-					className={buttonVariants({ variant: 'outline' })}
-				>
-					Session types
-				</Link>
-				<Link
-					href="/dashboard/availability"
-					className={buttonVariants({ variant: 'outline' })}
-				>
-					Availability
-				</Link>
+				<Button asChild variant="outline">
+					<Link href="/dashboard/session-types">Session types</Link>
+				</Button>
+				<Button asChild variant="outline">
+					<Link href="/dashboard/availability">Availability</Link>
+				</Button>
 			</nav>
 		</div>
 	);
