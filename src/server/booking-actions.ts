@@ -175,7 +175,7 @@ export const cancelBooking = async (
 			.select({ booking: bookings, userId: clients.userId })
 			.from(bookings)
 			.innerJoin(clients, eq(bookings.clientId, clients.id))
-			.where(eq(bookings.id, parsed.data.bookingId))
+			.where(eq(bookings.id, parsed.data))
 			.limit(1);
 		const row = rows[0];
 
@@ -194,7 +194,7 @@ export const cancelBooking = async (
 				cancelledBy: 'client',
 				cancelledAt: new Date()
 			})
-			.where(eq(bookings.id, parsed.data.bookingId));
+			.where(eq(bookings.id, parsed.data));
 
 		return { success: true };
 	});

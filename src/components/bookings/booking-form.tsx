@@ -82,7 +82,6 @@ export const BookingForm = ({
 
 	return (
 		<form action={formAction} className="flex max-w-xl flex-col gap-5">
-			<p className="text-sm text-gray-600">Times are shown in Europe/Prague.</p>
 
 			<div>
 				<label htmlFor="sessionTypeId" className="font-medium">

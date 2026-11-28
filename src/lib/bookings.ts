@@ -138,9 +138,7 @@ export const createBookingSchema = z.object({
 	notes: z.string().max(1000, 'Note is too long').nullable()
 });
 
-export const cancelBookingSchema = z.object({
-	bookingId: z.string().regex(/^[0-9a-f]{32}$/, 'Invalid booking')
-});
+export const cancelBookingSchema = z.string().regex(/^[0-9a-f]{32}$/, 'Invalid booking');
 
 export type BookingFieldErrors = Partial<
 	Record<keyof z.infer<typeof createBookingSchema>, string[]>
