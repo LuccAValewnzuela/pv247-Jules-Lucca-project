@@ -131,15 +131,43 @@ export const toSlotOptions = (slots: BookableSlot[]): SlotOption[] =>
 		dayLabel: formatPragueDate(slot.startsAt)
 	}));
 
-export const createBookingSchema = z.object({
+const bookingDetailsSchema = z.object({
 	sessionTypeId: z.string().regex(ID_PATTERN, 'Invalid session type id'),
 	format: z.enum(['in_person', 'online']),
 	startsAt: z
 		.string()
 		.regex(DATE_TIME_LOCAL_PATTERN, 'Use a valid date and time'),
-	clientId: z.string().regex(ID_PATTERN, 'Invalid client id').optional(),
 	notes: z.string().max(1000, 'Note is too long').nullable()
 });
+
+export const createBookingSchema = bookingDetailsSchema;
+
+export const createTherapistBookingSchema = bookingDetailsSchema
+	.extend({
+		clientId: z.string().regex(ID_PATTERN, 'Invalid client id').optional(),
+		clientName: z.string().trim().max(120, 'Name is too long.').optional(),
+		clientEmail: z.email('Enter a valid email.').optional(),
+		clientPhone: z.string().trim().max(80, 'Phone is too long.').optional()
+	})
+	.superRefine(({ clientId, clientName, clientEmail }, ctx) => {
+		if (clientId) return;
+
+		if (!clientName) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['clientName'],
+				message: 'Enter a client name.'
+			});
+		}
+
+		if (!clientEmail) {
+			ctx.addIssue({
+				code: 'custom',
+				path: ['clientEmail'],
+				message: 'Enter a client email.'
+			});
+		}
+	});
 
 export const bookingIdSchema = z.string().regex(ID_PATTERN, 'Invalid booking');
 
@@ -153,7 +181,14 @@ export const rescheduleBookingSchema = z.object({
 });
 
 export type BookingFieldErrors = Partial<
-	Record<keyof z.infer<typeof createBookingSchema>, string[]>
+	Record<
+		| keyof z.infer<typeof createBookingSchema>
+		| 'clientId'
+		| 'clientName'
+		| 'clientEmail'
+		| 'clientPhone',
+		string[]
+	>
 >;
 
 export type BookingActionState = {

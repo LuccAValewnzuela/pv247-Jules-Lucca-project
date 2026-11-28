@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { isTherapist, requireUser } from '@/auth/session';
@@ -7,14 +6,17 @@ import { BookingForm } from '@/components/bookings';
 import { Loader } from '@/components/ui/loader';
 import { toSlotOptions } from '@/lib/bookings';
 import { getActiveSessionTypes, getBookableSlots } from '@/server/bookings';
+import { getClients } from '@/server/clients';
 
 export const metadata: Metadata = { title: 'Book a session' };
 
 const BookingSection = async () => {
 	const session = await requireUser('/book');
-	if (isTherapist(session)) redirect('/dashboard');
-
-	const sessionTypes = await getActiveSessionTypes();
+	const therapist = isTherapist(session);
+	const [sessionTypes, clients] = await Promise.all([
+		getActiveSessionTypes(),
+		therapist ? getClients() : Promise.resolve([])
+	]);
 	if (sessionTypes.length === 0) {
 		return (
 			<p className="rounded-lg border border-gray-200 p-6 text-sm text-gray-500">
@@ -31,6 +33,8 @@ const BookingSection = async () => {
 			sessionTypes={sessionTypes}
 			initialSlots={toSlotOptions(result?.slots ?? [])}
 			defaultSessionTypeId={defaultSessionTypeId}
+			isTherapist={therapist}
+			clients={clients}
 		/>
 	);
 };

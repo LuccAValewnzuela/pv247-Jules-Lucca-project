@@ -1,10 +1,16 @@
 import 'server-only';
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, isNull, sql } from 'drizzle-orm';
 
 import { db } from '@/db/client';
 import { clients } from '@/db/schema';
 
 type NewAccount = { id: string; name: string; email: string };
+
+export const getClients = async () =>
+	db
+		.select({ id: clients.id, name: clients.name, email: clients.email })
+		.from(clients)
+		.orderBy(asc(clients.name));
 
 export const linkOrCreateClient = async ({ id, name, email }: NewAccount) => {
 	const existing = await db.query.clients.findFirst({

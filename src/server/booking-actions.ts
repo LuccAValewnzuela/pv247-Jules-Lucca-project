@@ -1,6 +1,6 @@
 'use server';
 
-import { and, eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
+import { and, eq, gt, gte, lt, lte, ne, sql } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
@@ -18,6 +18,7 @@ import {
 	canCancel,
 	cancelBookingSchema,
 	createBookingSchema,
+	createTherapistBookingSchema,
 	rescheduleBookingSchema,
 	toSlotOptions,
 	type BookingActionState,
@@ -42,6 +43,12 @@ const revalidateBookingPaths = () => {
 	revalidatePath(bookPath);
 	revalidatePath(myBookingsPath);
 	revalidatePath(dashboardBookingsPath);
+};
+
+const optionalFormText = (value: unknown) => {
+	if (typeof value !== 'string') return undefined;
+	const text = value.trim();
+	return text.length > 0 ? text : undefined;
 };
 
 const validateSlot = async (
@@ -211,6 +218,104 @@ export const createBooking = async (
 
 	revalidateBookingPaths();
 	redirect(myBookingsPath);
+};
+
+export const createTherapistBooking = async (
+	_prevState: BookingActionState,
+	formData: FormData
+): Promise<BookingActionState> => {
+	await assertTherapist();
+
+	const rawClientId = formData.get('clientId');
+	const parsed = createTherapistBookingSchema.safeParse({
+		sessionTypeId: formData.get('sessionTypeId'),
+		format: formData.get('format'),
+		startsAt: formData.get('startsAt'),
+		notes: formData.get('notes'),
+		clientId:
+			rawClientId && rawClientId !== 'new' ? String(rawClientId) : undefined,
+		clientName: optionalFormText(formData.get('clientName')),
+		clientEmail: optionalFormText(formData.get('clientEmail')),
+		clientPhone: optionalFormText(formData.get('clientPhone'))
+	});
+
+	if (!parsed.success) {
+		return {
+			errors: parsed.error.flatten().fieldErrors as BookingFieldErrors
+		};
+	}
+
+	const startsAt = parsePragueDateTimeLocal(parsed.data.startsAt);
+	if (!startsAt) {
+		return { message: 'Enter a valid Prague date and time.' };
+	}
+
+	const result = await db.transaction(async tx => {
+		let clientId: string;
+
+		if (parsed.data.clientId) {
+			const rows = await tx
+				.select({ id: clients.id })
+				.from(clients)
+				.where(eq(clients.id, parsed.data.clientId))
+				.limit(1);
+			const client = rows[0];
+
+			if (!client) {
+				return { message: 'Client not found.' };
+			}
+
+			clientId = client.id;
+		} else {
+			const clientName = parsed.data.clientName ?? '';
+			const clientEmail = parsed.data.clientEmail ?? '';
+			const existingRows = await tx
+				.select({ id: clients.id })
+				.from(clients)
+				.where(eq(sql`lower(${clients.email})`, clientEmail.toLowerCase()))
+				.limit(1);
+			const existing = existingRows[0];
+
+			if (existing) {
+				clientId = existing.id;
+			} else {
+				const inserted = await tx
+					.insert(clients)
+					.values({
+						name: clientName,
+						email: clientEmail,
+						phone: parsed.data.clientPhone ?? null
+					})
+					.returning({ id: clients.id });
+				clientId = inserted[0].id;
+			}
+		}
+
+		const slot = await validateSlot(tx, {
+			sessionTypeId: parsed.data.sessionTypeId,
+			startsAt
+		});
+		if (!slot.success) return slot;
+
+		await tx.insert(bookings).values({
+			clientId,
+			sessionTypeId: parsed.data.sessionTypeId,
+			availabilityBlockId: slot.availabilityBlockId,
+			priceCents: slot.priceCents,
+			format: parsed.data.format,
+			startsAt,
+			endsAt: slot.endsAt,
+			status: 'confirmed',
+			notes: parsed.data.notes || null
+		});
+
+		return { success: true };
+	});
+
+	if (!result.success) return result;
+
+	revalidateBookingPaths();
+	redirect(dashboardBookingsPath);
 };
 
 export const confirmBooking = async (

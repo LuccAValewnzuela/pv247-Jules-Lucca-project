@@ -22,24 +22,38 @@ import {
 } from '@/lib/bookings';
 import {
 	createBooking,
+	createTherapistBooking,
 	getSlotsForSessionType
 } from '@/server/booking-actions';
 import type { ActiveSessionType } from '@/server/bookings';
+
+type ClientOption = {
+	id: string;
+	name: string;
+	email: string;
+};
 
 type BookingFormProps = {
 	sessionTypes: ActiveSessionType[];
 	initialSlots: SlotOption[];
 	defaultSessionTypeId: string;
+	isTherapist: boolean;
+	clients: ClientOption[];
 };
 
 export const BookingForm = ({
 	sessionTypes,
 	initialSlots,
-	defaultSessionTypeId
+	defaultSessionTypeId,
+	isTherapist,
+	clients
 }: BookingFormProps) => {
 	const [state, formAction, pending] = useActionState(
-		createBooking,
+		isTherapist ? createTherapistBooking : createBooking,
 		initialBookingActionState
+	);
+	const [clientId, setClientId] = useState(
+		isTherapist ? (clients[0]?.id ?? 'new') : ''
 	);
 	const [sessionTypeId, setSessionTypeId] = useState(defaultSessionTypeId);
 	const [slots, setSlots] = useState(initialSlots);
@@ -77,11 +91,115 @@ export const BookingForm = ({
 		setSelectedSlot('');
 	};
 
+	const clientIdError = Boolean(state.errors?.clientId?.length);
+	const clientNameError = Boolean(state.errors?.clientName?.length);
+	const clientEmailError = Boolean(state.errors?.clientEmail?.length);
+	const clientPhoneError = Boolean(state.errors?.clientPhone?.length);
 	const startsAtError = Boolean(state.errors?.startsAt?.length);
 	const notesError = Boolean(state.errors?.notes?.length);
 
 	return (
 		<form action={formAction} className="flex max-w-xl flex-col gap-5">
+			{isTherapist && (
+				<>
+					<div>
+						<label htmlFor="client" className="font-medium">
+							Client
+						</label>
+						<Select
+							id="client"
+							value={clientId}
+							onChange={event => setClientId(event.target.value)}
+							disabled={pending}
+							required
+							aria-invalid={clientIdError}
+							aria-describedby={clientIdError ? 'client-error' : undefined}
+						>
+							{clients.map(client => (
+								<option key={client.id} value={client.id}>
+									{client.name} · {client.email}
+								</option>
+							))}
+							<option value="new">New client</option>
+						</Select>
+						{clientId !== 'new' && (
+							<input type="hidden" name="clientId" value={clientId} />
+						)}
+						<FieldError
+							id={clientIdError ? 'client-error' : undefined}
+							messages={state.errors?.clientId}
+						/>
+					</div>
+
+					{clientId === 'new' && (
+						<>
+							<div>
+								<label htmlFor="clientName" className="font-medium">
+									Client name
+								</label>
+								<Input
+									id="clientName"
+									name="clientName"
+									maxLength={120}
+									disabled={pending}
+									required
+									aria-invalid={clientNameError}
+									aria-describedby={
+										clientNameError ? 'clientName-error' : undefined
+									}
+								/>
+								<FieldError
+									id={clientNameError ? 'clientName-error' : undefined}
+									messages={state.errors?.clientName}
+								/>
+							</div>
+
+							<div>
+								<label htmlFor="clientEmail" className="font-medium">
+									Client email
+								</label>
+								<Input
+									id="clientEmail"
+									name="clientEmail"
+									type="email"
+									maxLength={254}
+									disabled={pending}
+									required
+									aria-invalid={clientEmailError}
+									aria-describedby={
+										clientEmailError ? 'clientEmail-error' : undefined
+									}
+								/>
+								<FieldError
+									id={clientEmailError ? 'clientEmail-error' : undefined}
+									messages={state.errors?.clientEmail}
+								/>
+							</div>
+
+							<div>
+								<label htmlFor="clientPhone" className="font-medium">
+									Phone (optional)
+								</label>
+								<Input
+									id="clientPhone"
+									name="clientPhone"
+									type="tel"
+									maxLength={80}
+									disabled={pending}
+									aria-invalid={clientPhoneError}
+									aria-describedby={
+										clientPhoneError ? 'clientPhone-error' : undefined
+									}
+								/>
+								<FieldError
+									id={clientPhoneError ? 'clientPhone-error' : undefined}
+									messages={state.errors?.clientPhone}
+								/>
+							</div>
+						</>
+					)}
+				</>
+			)}
 
 			<div>
 				<label htmlFor="sessionTypeId" className="font-medium">
@@ -199,7 +317,11 @@ export const BookingForm = ({
 			<FormAlert message={state.message} />
 
 			<Button type="submit" disabled={pending || slotsLoading || !selectedSlot}>
-				{pending ? 'Booking...' : 'Book session'}
+				{pending
+					? 'Creating...'
+					: isTherapist
+						? 'Create booking'
+						: 'Book session'}
 			</Button>
 		</form>
 	);
