@@ -1,4 +1,4 @@
-import { Metadata } from 'next';
+import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requireTherapist } from '@/auth/session';
@@ -13,8 +13,8 @@ const NewSessionType = async () => {
 };
 
 const NewSessionTypePage = () => (
-	<main>
-		<h1> New session type </h1>
+	<main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 p-6">
+		<h1 className="text-2xl font-semibold">New session type</h1>
 		<Suspense fallback={<Loader />}>
 			<NewSessionType />
 		</Suspense>
