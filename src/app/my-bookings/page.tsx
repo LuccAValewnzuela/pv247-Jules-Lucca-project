@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 
 import { requireUser } from '@/auth/session';
-import { Loader } from '@/components/loader';
+import { Loader } from '@/components/ui/loader';
 
 export const metadata: Metadata = { title: 'My bookings' };
 
