@@ -28,10 +28,6 @@ export const AvailabilityForm = () => {
 			action={formAction}
 			className="flex max-w-xl flex-col gap-4"
 		>
-			<p className="text-sm text-gray-600">
-				Times are entered in Europe/Prague.
-			</p>
-
 			<div>
 				<label htmlFor="startsAt" className="font-medium">
 					Start

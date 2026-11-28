@@ -1,7 +1,7 @@
 import { getSessionCookie } from 'better-auth/cookies';
 import { type NextRequest, NextResponse } from 'next/server';
 
-const protectedRoutes = ['/my-bookings', '/dashboard'];
+const protectedRoutes = ['/my-bookings', '/dashboard', '/book'];
 
 const isProtected = (pathname: string) =>
 	protectedRoutes.some(

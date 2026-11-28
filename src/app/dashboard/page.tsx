@@ -21,6 +21,9 @@ const Dashboard = async () => {
 				<Button asChild variant="outline">
 					<Link href="/dashboard/availability">Availability</Link>
 				</Button>
+				<Button asChild variant="outline">
+					<Link href="/dashboard/bookings">Bookings</Link>
+				</Button>
 			</nav>
 		</div>
 	);
