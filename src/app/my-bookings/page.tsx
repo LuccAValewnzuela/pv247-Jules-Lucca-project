@@ -8,7 +8,7 @@ import { BookingsCalendar } from '@/components/bookings';
 import { Button } from '@/components/ui/button';
 import { Loader } from '@/components/ui/loader';
 import { buildMonthGrid, parseMonthParam } from '@/lib/calendar';
-import { getMyBookingsForMonth } from '@/server/bookings';
+import { getBookingsForMonth } from '@/server/bookings';
 
 export const metadata: Metadata = { title: 'My bookings' };
 
@@ -20,7 +20,7 @@ const MyBookings = async ({ searchParams }: MyBookingsProps) => {
 
 	const { month: monthParam } = await searchParams;
 	const month = parseMonthParam(monthParam);
-	const bookings = await getMyBookingsForMonth(session.user.id, month);
+	const bookings = await getBookingsForMonth(month, session.user.id);
 
 	if (!bookings) {
 		return (
@@ -36,6 +36,7 @@ const MyBookings = async ({ searchParams }: MyBookingsProps) => {
 			days={buildMonthGrid(month)}
 			bookings={bookings}
 			todayMonthKey={parseMonthParam(undefined).key}
+			isTherapist={false}
 		/>
 	);
 };

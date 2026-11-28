@@ -3,6 +3,7 @@ import z from 'zod';
 import { formatPragueDate, formatTimeRange } from '@/lib/availability';
 
 const DATE_TIME_LOCAL_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/;
+const ID_PATTERN = /^[0-9a-f]{32}$/;
 
 const pragueLocalPartsFormatter = new Intl.DateTimeFormat('en-US', {
 	timeZone: 'Europe/Prague',
@@ -95,13 +96,14 @@ export const generateSlots = ({
 	return slots;
 };
 
-export const canClientCancel = (
+export const canCancel = (
 	status: BookingStatus,
 	startsAt: Date,
+	isTherapist: boolean,
 	now = new Date()
 ): boolean =>
 	(status === 'pending' || status === 'confirmed') &&
-	startsAt.getTime() - now.getTime() >= CANCEL_LEAD_MS;
+	(isTherapist || startsAt.getTime() - now.getTime() >= CANCEL_LEAD_MS);
 
 const pragueDateTimeLocalParts = (date: Date) => {
 	const parts = pragueLocalPartsFormatter.formatToParts(date);
@@ -130,15 +132,25 @@ export const toSlotOptions = (slots: BookableSlot[]): SlotOption[] =>
 	}));
 
 export const createBookingSchema = z.object({
-	sessionTypeId: z.string().regex(/^[0-9a-f]{32}$/, 'Invalid session type id'),
+	sessionTypeId: z.string().regex(ID_PATTERN, 'Invalid session type id'),
 	format: z.enum(['in_person', 'online']),
 	startsAt: z
 		.string()
 		.regex(DATE_TIME_LOCAL_PATTERN, 'Use a valid date and time'),
+	clientId: z.string().regex(ID_PATTERN, 'Invalid client id').optional(),
 	notes: z.string().max(1000, 'Note is too long').nullable()
 });
 
-export const cancelBookingSchema = z.string().regex(/^[0-9a-f]{32}$/, 'Invalid booking');
+export const bookingIdSchema = z.string().regex(ID_PATTERN, 'Invalid booking');
+
+export const cancelBookingSchema = bookingIdSchema;
+
+export const rescheduleBookingSchema = z.object({
+	bookingId: bookingIdSchema,
+	startsAt: z
+		.string()
+		.regex(DATE_TIME_LOCAL_PATTERN, 'Use a valid date and time')
+});
 
 export type BookingFieldErrors = Partial<
 	Record<keyof z.infer<typeof createBookingSchema>, string[]>

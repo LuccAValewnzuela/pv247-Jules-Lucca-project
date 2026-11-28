@@ -12,7 +12,7 @@ import {
 	formatTimeRange
 } from '@/lib/availability';
 import {
-	canClientCancel,
+	canCancel,
 	formatLabels,
 	initialBookingActionState,
 	statusLabels,
@@ -26,8 +26,10 @@ import {
 	type Month
 } from '@/lib/calendar';
 import { cn } from '@/lib/cn';
-import { cancelBooking } from '@/server/booking-actions';
+import { cancelBooking, confirmBooking } from '@/server/booking-actions';
 import type { MonthBooking } from '@/server/bookings';
+
+import { RescheduleForm } from './reschedule-form';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -36,20 +38,29 @@ type BookingsCalendarProps = {
 	days: CalendarDay[];
 	bookings: MonthBooking[];
 	todayMonthKey: string;
+	isTherapist: boolean;
 };
 
 export const BookingsCalendar = ({
 	month,
 	days,
 	bookings,
-	todayMonthKey
+	todayMonthKey,
+	isTherapist
 }: BookingsCalendarProps) => {
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [confirming, setConfirming] = useState(false);
+	const [rescheduling, setRescheduling] = useState(false);
+	const [confirmState, confirmAction, confirmPending] = useActionState(
+		confirmBooking,
+		initialBookingActionState
+	);
 	const [cancelState, cancelAction, cancelPending] = useActionState(
 		cancelBooking,
 		initialBookingActionState
 	);
+
+	const baseUrl = isTherapist ? '/dashboard/bookings' : '/my-bookings';
 
 	const bookingsByDay = useMemo(() => {
 		const grouped = new Map<string, MonthBooking[]>();
@@ -81,7 +92,7 @@ export const BookingsCalendar = ({
 			<div className="flex flex-wrap items-center justify-between gap-3">
 				<div className="flex items-center gap-3">
 					<Button asChild variant="outline" size="sm">
-						<Link href={`/my-bookings?month=${shiftMonth(month, -1).key}`}>
+						<Link href={`${baseUrl}?month=${shiftMonth(month, -1).key}`}>
 							Previous
 						</Link>
 					</Button>
@@ -89,14 +100,14 @@ export const BookingsCalendar = ({
 						{formatMonthLabel(month)}
 					</h2>
 					<Button asChild variant="outline" size="sm">
-						<Link href={`/my-bookings?month=${shiftMonth(month, 1).key}`}>
+						<Link href={`${baseUrl}?month=${shiftMonth(month, 1).key}`}>
 							Next
 						</Link>
 					</Button>
 				</div>
 				{month.key !== todayMonthKey && (
 					<Button asChild variant="link" size="sm">
-						<Link href={`/my-bookings?month=${todayMonthKey}`}>Today</Link>
+						<Link href={`${baseUrl}?month=${todayMonthKey}`}>Today</Link>
 					</Button>
 				)}
 			</div>
@@ -156,6 +167,7 @@ export const BookingsCalendar = ({
 											onClick={() => {
 												setSelectedId(booking.id);
 												setConfirming(false);
+												setRescheduling(false);
 											}}
 											aria-pressed={selectedId === booking.id}
 											className={cn(
@@ -172,7 +184,9 @@ export const BookingsCalendar = ({
 													)}
 												/>
 												<span className="truncate">
-													{booking.sessionType.name}
+													{isTherapist
+														? booking.client.name
+														: booking.sessionType.name}
 												</span>
 											</span>
 											<span className="text-gray-600">
@@ -193,9 +207,21 @@ export const BookingsCalendar = ({
 					className="rounded-lg border border-gray-200 p-4"
 				>
 					<div className="flex flex-wrap items-center gap-3">
-						<h3 className="text-lg font-semibold">
-							{selected.sessionType.name}
-						</h3>
+						<div>
+							{isTherapist ? (
+								<div>
+									<span className="text-lg font-semibold">
+										{selected.client.name}
+									</span>
+									<span> - </span>
+									<span className="text-md">{selected.sessionType.name}</span>
+								</div>
+							) : (
+								<span className="text-lg font-semibold">
+									{selected.sessionType.name}
+								</span>
+							)}
+						</div>
 						<span className="rounded bg-gray-100 px-2 py-0.5 text-xs">
 							{statusLabels[selected.status]}
 						</span>
@@ -226,46 +252,99 @@ export const BookingsCalendar = ({
 						</div>
 					</dl>
 
-					<div className="mt-4">
-						{canClientCancel(selected.status, selected.startsAt) &&
-							(confirming ? (
-								<form
-									action={cancelAction}
-									className="flex flex-wrap items-center gap-3"
-								>
+					<div className="mt-4 flex flex-col gap-3">
+						<div className="flex flex-wrap items-center gap-3">
+							{isTherapist && selected.status === 'pending' && (
+								<form action={confirmAction}>
 									<input type="hidden" name="bookingId" value={selected.id} />
-									<p className="text-sm text-gray-600">Cancel this booking?</p>
 									<Button
 										type="submit"
-										variant="destructive"
 										size="sm"
-										disabled={cancelPending}
+										disabled={confirmPending || cancelPending || rescheduling}
 									>
-										{cancelPending ? 'Cancelling...' : 'Yes, cancel'}
+										{confirmPending ? 'Confirming...' : 'Confirm booking'}
 									</Button>
+								</form>
+							)}
+
+							{isTherapist &&
+								(selected.status === 'pending' ||
+									selected.status === 'confirmed') &&
+								!rescheduling && (
 									<Button
 										type="button"
 										variant="outline"
 										size="sm"
-										disabled={cancelPending}
-										onClick={() => setConfirming(false)}
+										disabled={confirmPending || cancelPending || confirming}
+										onClick={() => {
+											setRescheduling(true);
+											setConfirming(false);
+										}}
 									>
-										Keep booking
+										Reschedule
 									</Button>
-								</form>
-							) : (
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									onClick={() => setConfirming(true)}
-								>
-									Cancel booking
-								</Button>
-							))}
+								)}
+
+							{canCancel(selected.status, selected.startsAt, isTherapist) &&
+								(confirming ? (
+									<form
+										action={cancelAction}
+										className="flex flex-wrap items-center gap-3"
+									>
+										<input type="hidden" name="bookingId" value={selected.id} />
+										<p className="text-sm text-gray-600">
+											Cancel this booking?
+										</p>
+										<Button
+											type="submit"
+											variant="destructive"
+											size="sm"
+											disabled={cancelPending}
+										>
+											{cancelPending ? 'Cancelling...' : 'Yes, cancel'}
+										</Button>
+										<Button
+											type="button"
+											variant="outline"
+											size="sm"
+											disabled={cancelPending}
+											onClick={() => setConfirming(false)}
+										>
+											Keep booking
+										</Button>
+									</form>
+								) : (
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										disabled={confirmPending || rescheduling}
+										onClick={() => {
+											setConfirming(true);
+											setRescheduling(false);
+										}}
+									>
+										Cancel booking
+									</Button>
+								))}
+
+							<FormAlert message={confirmState.message} />
+						</div>
+
+						{isTherapist &&
+							rescheduling &&
+							(selected.status === 'pending' ||
+								selected.status === 'confirmed') && (
+								<RescheduleForm
+									key={selected.id}
+									booking={selected}
+									onClose={() => setRescheduling(false)}
+								/>
+							)}
+
 						{(selected.status === 'pending' ||
 							selected.status === 'confirmed') &&
-							!canClientCancel(selected.status, selected.startsAt) && (
+							!canCancel(selected.status, selected.startsAt, isTherapist) && (
 								<p className="text-sm text-gray-500">
 									Cancellation closes 48 hours before the session.
 								</p>

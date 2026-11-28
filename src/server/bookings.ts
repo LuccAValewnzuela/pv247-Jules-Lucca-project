@@ -28,7 +28,10 @@ export const getActiveSessionTypes = async () =>
 		.where(eq(sessionTypes.isActive, true))
 		.orderBy(asc(sessionTypes.name));
 
-export const getBookableSlots = async (sessionTypeId: string) => {
+export const getBookableSlots = async (
+	sessionTypeId: string,
+	options?: { excludeBookingId?: string }
+) => {
 	const sessionTypeRows = await db
 		.select()
 		.from(sessionTypes)
@@ -51,7 +54,15 @@ export const getBookableSlots = async (sessionTypeId: string) => {
 	const taken = await db
 		.select({ startsAt: bookings.startsAt, endsAt: bookings.endsAt })
 		.from(bookings)
-		.where(and(ne(bookings.status, 'cancelled'), gte(bookings.endsAt, now)));
+		.where(
+			and(
+				ne(bookings.status, 'cancelled'),
+				gte(bookings.endsAt, now),
+				options?.excludeBookingId
+					? ne(bookings.id, options.excludeBookingId)
+					: undefined
+			)
+		);
 
 	const slots = blocks.flatMap(block =>
 		generateSlots({
@@ -96,21 +107,21 @@ export const getMyBookings = async (userId: string) => {
 	return { upcoming, past };
 };
 
-export const getMyBookingsForMonth = async (userId: string, month: Month) => {
-	const client = await getClientForUser(userId);
-	if (!client) return null;
-
+export const getBookingsForMonth = async (month: Month, userId?: string) => {
 	const [start, end] = pragueMonthBounds(month);
+
+	const client = userId ? await getClientForUser(userId) : undefined;
+	if (userId && !client) return null;
 
 	return db.query.bookings.findMany({
 		where: and(
-			eq(bookings.clientId, client.id),
+			client ? eq(bookings.clientId, client.id) : undefined,
 			gte(bookings.startsAt, start),
 			lt(bookings.startsAt, end),
 			ne(bookings.status, 'cancelled')
 		),
 		orderBy: [asc(bookings.startsAt)],
-		with: { sessionType: true }
+		with: { sessionType: true, client: true }
 	});
 };
 
@@ -127,5 +138,5 @@ export type MyBooking = NonNullable<
 >['upcoming'][number];
 
 export type MonthBooking = NonNullable<
-	Awaited<ReturnType<typeof getMyBookingsForMonth>>
+	Awaited<ReturnType<typeof getBookingsForMonth>>
 >[number];

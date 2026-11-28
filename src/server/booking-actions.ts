@@ -4,7 +4,7 @@ import { and, eq, gt, gte, lt, lte, ne } from 'drizzle-orm';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
-import { assertUser, isTherapist } from '@/auth/session';
+import { assertTherapist, assertUser, isTherapist } from '@/auth/session';
 import { db } from '@/db/client';
 import {
 	availabilityBlocks,
@@ -14,9 +14,11 @@ import {
 } from '@/db/schema';
 import { parsePragueDateTimeLocal } from '@/lib/availability';
 import {
-	canClientCancel,
+	bookingIdSchema,
+	canCancel,
 	cancelBookingSchema,
 	createBookingSchema,
+	rescheduleBookingSchema,
 	toSlotOptions,
 	type BookingActionState,
 	type BookingFieldErrors,
@@ -26,17 +28,122 @@ import { getBookableSlots } from '@/server/bookings';
 
 const bookPath = '/book';
 const myBookingsPath = '/my-bookings';
+const dashboardBookingsPath = '/dashboard/bookings';
+
+type BookingTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+type ValidateSlotOptions = {
+	sessionTypeId: string;
+	startsAt: Date;
+	excludeBookingId?: string;
+};
+
+const revalidateBookingPaths = () => {
+	revalidatePath(bookPath);
+	revalidatePath(myBookingsPath);
+	revalidatePath(dashboardBookingsPath);
+};
+
+const validateSlot = async (
+	tx: BookingTransaction,
+	{ sessionTypeId, startsAt, excludeBookingId }: ValidateSlotOptions
+) => {
+	const sessionTypeRows = await tx
+		.select()
+		.from(sessionTypes)
+		.where(
+			and(eq(sessionTypes.id, sessionTypeId), eq(sessionTypes.isActive, true))
+		)
+		.limit(1);
+	const sessionType = sessionTypeRows[0];
+
+	if (!sessionType) {
+		return {
+			success: false as const,
+			message: 'This session type is not available.'
+		};
+	}
+
+	const endsAt = new Date(
+		startsAt.getTime() + sessionType.durationMinutes * 60_000
+	);
+
+	if (startsAt <= new Date()) {
+		return {
+			success: false as const,
+			message: 'The selected time has passed.'
+		};
+	}
+
+	const blockRows = await tx
+		.select({ id: availabilityBlocks.id })
+		.from(availabilityBlocks)
+		.where(
+			and(
+				lte(availabilityBlocks.startsAt, startsAt),
+				gte(availabilityBlocks.endsAt, endsAt)
+			)
+		)
+		.limit(2);
+
+	if (blockRows.length !== 1) {
+		return {
+			success: false as const,
+			message: 'The selected time is not available.'
+		};
+	}
+
+	const overlapping = await tx
+		.select({ id: bookings.id })
+		.from(bookings)
+		.where(
+			and(
+				ne(bookings.status, 'cancelled'),
+				lt(bookings.startsAt, endsAt),
+				gt(bookings.endsAt, startsAt),
+				excludeBookingId ? ne(bookings.id, excludeBookingId) : undefined
+			)
+		)
+		.limit(1);
+
+	if (overlapping.length > 0) {
+		return { success: false as const, message: 'This slot is already booked.' };
+	}
+
+	return {
+		success: true as const,
+		availabilityBlockId: blockRows[0].id,
+		endsAt,
+		priceCents: sessionType.priceCents
+	};
+};
 
 export const getSlotsForSessionType = async (
-	sessionTypeId: string
+	sessionTypeId: string,
+	excludeBookingId?: string
 ): Promise<{ slots: SlotOption[] }> => {
-	await assertUser();
+	const session = await assertUser();
 
 	const parsedId =
 		createBookingSchema.shape.sessionTypeId.safeParse(sessionTypeId);
 	if (!parsedId.success) return { slots: [] };
 
-	const result = await getBookableSlots(parsedId.data);
+	const parsedExcludeBookingId = excludeBookingId
+		? bookingIdSchema.safeParse(excludeBookingId)
+		: null;
+
+	if (
+		excludeBookingId &&
+		(!parsedExcludeBookingId?.success || !isTherapist(session))
+	) {
+		return { slots: [] };
+	}
+
+	const result = await getBookableSlots(parsedId.data, {
+		excludeBookingId: parsedExcludeBookingId?.success
+			? parsedExcludeBookingId.data
+			: undefined
+	});
 	return { slots: toSlotOptions(result?.slots ?? []) };
 };
 
@@ -79,69 +186,20 @@ export const createBooking = async (
 			return { message: 'Client profile not found.' };
 		}
 
-		const sessionTypeRows = await tx
-			.select()
-			.from(sessionTypes)
-			.where(
-				and(
-					eq(sessionTypes.id, parsed.data.sessionTypeId),
-					eq(sessionTypes.isActive, true)
-				)
-			)
-			.limit(1);
-		const sessionType = sessionTypeRows[0];
-
-		if (!sessionType) {
-			return { message: 'This session type is not available.' };
-		}
-
-		const endsAt = new Date(
-			startsAt.getTime() + sessionType.durationMinutes * 60_000
-		);
-
-		if (startsAt <= new Date()) {
-			return { message: 'The selected time has passed.' };
-		}
-
-		const blockRows = await tx
-			.select({ id: availabilityBlocks.id })
-			.from(availabilityBlocks)
-			.where(
-				and(
-					lte(availabilityBlocks.startsAt, startsAt),
-					gte(availabilityBlocks.endsAt, endsAt)
-				)
-			)
-			.limit(2);
-
-		if (blockRows.length !== 1) {
-			return { message: 'The selected time is not available.' };
-		}
-
-		const overlapping = await tx
-			.select({ id: bookings.id })
-			.from(bookings)
-			.where(
-				and(
-					ne(bookings.status, 'cancelled'),
-					lt(bookings.startsAt, endsAt),
-					gt(bookings.endsAt, startsAt)
-				)
-			)
-			.limit(1);
-
-		if (overlapping.length > 0) {
-			return { message: 'This slot is already booked.' };
-		}
+		const slot = await validateSlot(tx, {
+			sessionTypeId: parsed.data.sessionTypeId,
+			startsAt
+		});
+		if (!slot.success) return slot;
 
 		await tx.insert(bookings).values({
 			clientId: client.id,
-			sessionTypeId: sessionType.id,
-			availabilityBlockId: blockRows[0].id,
-			priceCents: sessionType.priceCents,
+			sessionTypeId: parsed.data.sessionTypeId,
+			availabilityBlockId: slot.availabilityBlockId,
+			priceCents: slot.priceCents,
 			format: parsed.data.format,
 			startsAt,
-			endsAt,
+			endsAt: slot.endsAt,
 			status: 'pending',
 			notes: parsed.data.notes || null
 		});
@@ -151,9 +209,122 @@ export const createBooking = async (
 
 	if (!result.success) return result;
 
-	revalidatePath(bookPath);
-	revalidatePath(myBookingsPath);
+	revalidateBookingPaths();
 	redirect(myBookingsPath);
+};
+
+export const confirmBooking = async (
+	_prevState: BookingActionState,
+	formData: FormData
+): Promise<BookingActionState> => {
+	await assertTherapist();
+
+	const parsed = bookingIdSchema.safeParse(formData.get('bookingId'));
+	if (!parsed.success) {
+		return { message: 'Invalid booking.' };
+	}
+
+	const result = await db.transaction(async tx => {
+		const rows = await tx
+			.select()
+			.from(bookings)
+			.where(eq(bookings.id, parsed.data))
+			.limit(1);
+		const booking = rows[0];
+
+		if (!booking) {
+			return { message: 'Booking not found.' };
+		}
+
+		if (booking.status !== 'pending') {
+			return { message: 'Only pending bookings can be confirmed.' };
+		}
+
+		await tx
+			.update(bookings)
+			.set({ status: 'confirmed' })
+			.where(eq(bookings.id, booking.id));
+
+		return { success: true };
+	});
+
+	if (result.success) revalidateBookingPaths();
+
+	return result;
+};
+
+export const rescheduleBooking = async (
+	_prevState: BookingActionState,
+	formData: FormData
+): Promise<BookingActionState> => {
+	await assertTherapist();
+
+	const parsed = rescheduleBookingSchema.safeParse({
+		bookingId: formData.get('bookingId'),
+		startsAt: formData.get('startsAt')
+	});
+
+	if (!parsed.success) {
+		return { message: 'Enter a valid date and time.' };
+	}
+
+	const startsAt = parsePragueDateTimeLocal(parsed.data.startsAt);
+	if (!startsAt) {
+		return { message: 'Enter a valid Prague date and time.' };
+	}
+
+	const result = await db.transaction(async tx => {
+		const rows = await tx
+			.select()
+			.from(bookings)
+			.where(eq(bookings.id, parsed.data.bookingId))
+			.limit(1);
+		const booking = rows[0];
+
+		if (!booking) {
+			return { message: 'Booking not found.' };
+		}
+
+		if (booking.status !== 'pending' && booking.status !== 'confirmed') {
+			return { message: 'This booking can no longer be rescheduled.' };
+		}
+
+		const slot = await validateSlot(tx, {
+			sessionTypeId: booking.sessionTypeId,
+			startsAt,
+			excludeBookingId: booking.id
+		});
+		if (!slot.success) return slot;
+
+		await tx
+			.update(bookings)
+			.set({
+				status: 'cancelled',
+				cancelledBy: 'therapist',
+				cancelledAt: new Date()
+			})
+			.where(eq(bookings.id, booking.id));
+
+		await tx.insert(bookings).values({
+			clientId: booking.clientId,
+			sessionTypeId: booking.sessionTypeId,
+			availabilityBlockId: slot.availabilityBlockId,
+			priceCents: booking.priceCents,
+			format: booking.format,
+			startsAt,
+			endsAt: slot.endsAt,
+			status: 'confirmed',
+			videoCallUrl: booking.videoCallUrl,
+			notes: booking.notes,
+			rescheduledFromId: booking.id
+		});
+
+		return { success: true };
+	});
+
+	if (result.success) revalidateBookingPaths();
+
+	return result;
 };
 
 export const cancelBooking = async (
@@ -161,9 +332,7 @@ export const cancelBooking = async (
 	formData: FormData
 ): Promise<BookingActionState> => {
 	const session = await assertUser();
-	if (isTherapist(session)) {
-		return { message: 'Therapists cannot cancel client bookings here.' };
-	}
+	const therapist = isTherapist(session);
 
 	const parsed = cancelBookingSchema.safeParse(formData.get('bookingId'));
 	if (!parsed.success) {
@@ -179,11 +348,11 @@ export const cancelBooking = async (
 			.limit(1);
 		const row = rows[0];
 
-		if (!row || row.userId !== session.user.id) {
+		if (!row || (!therapist && row.userId !== session.user.id)) {
 			return { message: 'Booking not found.' };
 		}
 
-		if (!canClientCancel(row.booking.status, row.booking.startsAt)) {
+		if (!canCancel(row.booking.status, row.booking.startsAt, therapist)) {
 			return { message: 'This booking can no longer be cancelled.' };
 		}
 
@@ -191,7 +360,7 @@ export const cancelBooking = async (
 			.update(bookings)
 			.set({
 				status: 'cancelled',
-				cancelledBy: 'client',
+				cancelledBy: therapist ? 'therapist' : 'client',
 				cancelledAt: new Date()
 			})
 			.where(eq(bookings.id, parsed.data));
@@ -199,10 +368,7 @@ export const cancelBooking = async (
 		return { success: true };
 	});
 
-	if (result.success) {
-		revalidatePath(bookPath);
-		revalidatePath(myBookingsPath);
-	}
+	if (result.success) revalidateBookingPaths();
 
 	return result;
 };
